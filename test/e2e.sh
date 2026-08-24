@@ -156,27 +156,30 @@ echo "  workspace=$WS tab=$TAB A=$A B=$B C=$C"
 
 reset() { set_ratio "$TAB" '[]' 0.5; set_ratio "$TAB" '[true]' 0.5; }
 
-section "manual apply: nested pane targets its immediate parent only"
+section "manual apply: nested pane reaches the golden share of the TAB"
 reset
 focus_pane "$C"; sleep 0.3
 herdr plugin action invoke apply --plugin vv.golden-ratio >/dev/null; sleep 0.8
-got="$(ratios "$A")"
-[ "$got" = "right:0.500 down:0.382" ] \
-  && ok "inner split -> 0.382, root untouched  ($got)" \
-  || bad "inner split -> 0.382, root untouched" "got: $got"
-f="$(fraction "$C" height)"
-awk -v f="$f" 'BEGIN{exit !(f>0.58 && f<0.65)}' \
-  && ok "focused pane occupies ~61.8% of its axis  ($f)" \
-  || bad "focused pane occupies ~61.8%" "got $f"
+# C sits under root(right) then inner(down), so it should be golden on both axes.
+for ax in width height; do
+  f="$(fraction "$C" "$ax")"
+  awk -v f="$f" 'BEGIN{exit !(f>0.58 && f<0.65)}' \
+    && ok "nested pane is ~61.8% of tab $ax  ($f)" \
+    || bad "nested pane is ~61.8% of tab $ax" "got $f"
+done
 
-section "manual apply: outer pane targets the root split"
+section "manual apply: outer pane touches only the axis that separates it"
 reset
 focus_pane "$A"; sleep 0.3
 herdr plugin action invoke apply --plugin vv.golden-ratio >/dev/null; sleep 0.8
 got="$(ratios "$A")"
 [ "$got" = "right:0.618 down:0.500" ] \
-  && ok "root split -> 0.618, inner untouched  ($got)" \
-  || bad "root split -> 0.618, inner untouched" "got: $got"
+  && ok "root split -> 0.618, unrelated inner split untouched  ($got)" \
+  || bad "root split -> 0.618, unrelated inner split untouched" "got: $got"
+f="$(fraction "$A" height)"
+awk -v f="$f" 'BEGIN{exit !(f>0.99)}' \
+  && ok "pane not split vertically keeps full height  ($f)" \
+  || bad "pane keeps full height" "got $f"
 
 section "idempotency"
 before="$(ratios "$A")"
@@ -223,10 +226,10 @@ focus_pane "$A"; sleep 0.5
 reset
 refocus "$C" "$A"
 sleep 1.5
-got="$(ratios "$A")"
-[ "$got" = "right:0.500 down:0.382" ] \
-  && ok "focus alone triggered the resize  ($got)" \
-  || bad "focus alone triggered the resize" "got: $got"
+f="$(fraction "$C" height)"
+awk -v f="$f" 'BEGIN{exit !(f>0.58 && f<0.65)}' \
+  && ok "focus alone triggered the resize  (height $f)" \
+  || bad "focus alone triggered the resize" "got height $f"
 
 section "auto mode: rapid focus burst coalesces on the final pane"
 reset
@@ -251,6 +254,30 @@ got="$(ratios "$A")"
 [ "${got%% *}" = "right:0.750" ] \
   && ok "configured ratio honoured  ($got)" \
   || bad "configured ratio honoured" "got: $got"
+
+section "regression: three columns, every pane reaches golden width"
+plugin_cfg ""   # the previous section left a custom ratio in place
+# Splitting right twice nests rather than making three siblings:
+#   root(right){ X, inner(right){ Y, Z } }
+# Adjusting only the immediate parent left Y and Z at 31% of the tab.
+T3=$(herdr tab create --workspace "$WS" --label cols --no-focus | jqp '
+import json,sys
+d=json.load(sys.stdin)["result"]; print(d["tab"]["tab_id"], d["root_pane"]["pane_id"])')
+read -r TAB3 X <<<"$T3"
+Y=$(herdr pane split "$X" --direction right --no-focus | jqp 'import json,sys; print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
+Z=$(herdr pane split "$Y" --direction right --no-focus | jqp 'import json,sys; print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
+herdr tab focus "$TAB3" >/dev/null 2>&1
+for target in "$X" "$Y" "$Z"; do
+  set_ratio "$TAB3" '[]' 0.5; set_ratio "$TAB3" '[true]' 0.5
+  focus_pane "$target"; sleep 0.3
+  herdr plugin action invoke apply --plugin vv.golden-ratio >/dev/null; sleep 0.8
+  f="$(fraction "$target" width)"
+  awk -v f="$f" 'BEGIN{exit !(f>0.58 && f<0.65)}' \
+    && ok "${target##*:} reaches ~61.8% of tab width  ($f)" \
+    || bad "${target##*:} reaches ~61.8% of tab width" "got $f"
+done
+herdr tab close "$TAB3" >/dev/null 2>&1
+herdr tab focus "$TAB" >/dev/null 2>&1
 
 section "teardown"
 plugin_cfg ""

@@ -1,7 +1,7 @@
 # herdr-golden-ratio
 
 Automatically resize the focused [Herdr](https://herdr.dev) pane to occupy
-the golden ratio (~61.8%) of its parent split. It's a Herdr-port of the
+the golden ratio (~61.8%) of the tab. It's a Herdr-port of the
 vim `golden-ratio` plugin.
 
 Works two ways:
@@ -61,7 +61,7 @@ herdr server reload-config
 ## Additional configuration
 
 ```toml
-# Fraction of the parent split given to the focused pane.
+# Fraction of the tab given to the focused pane.
 ratio = 0.618
 
 # Re-balance on every focus change, with no keypress. Off by default.

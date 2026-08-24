@@ -1,8 +1,8 @@
 id = "vv.golden-ratio"
 name = "Golden Ratio"
-version = "0.1.0"
+version = "0.2.0"
 min_herdr_version = "0.8.0"
-description = "Resize the focused pane to the golden ratio (~61.8%) of its parent split, in place — same tab, same pane ids, processes and scrollback preserved."
+description = "Resize the focused pane to the golden ratio (~61.8%) of the tab, in place — same tab, same pane ids, processes and scrollback preserved."
 platforms = ["linux", "macos"]
 
 [[build]]

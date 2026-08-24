@@ -3,10 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
+	"math"
 )
 
 // Golden is the reciprocal of the golden ratio: 1/phi == phi-1 == 0.6180339...
-// The focused pane's side of its parent split gets this fraction of the space.
+// The focused pane gets this fraction of the tab along each axis it is split on.
 const Golden = 0.6180339887498949
 
 // Node is one node in a tab's binary (BSP) layout tree, as returned by the
@@ -70,58 +71,91 @@ const (
 )
 
 // ComputeGoldenRatio works out how to give focusedPaneID the fraction `ratio`
-// of its immediate parent split.
+// of the whole tab, along each axis it is split on.
 //
-// Only the immediate parent split is touched. Propagating the ratio up the tree
-// would compound it (a pane nested three levels deep would end up with
-// 0.618^3, about 24% of the tab — shrinking the more nested it is, the opposite
-// of the intent) and would disturb splits containing panes the user never
-// focused. Adjusting one split is also the least surprising thing to undo.
+// Adjusting only the pane's immediate parent split is not enough. Splitting
+// right twice does not produce three siblings; it nests:
 //
-// The returned Resize is a pure function of its inputs; it performs no I/O.
-func ComputeGoldenRatio(root *Node, focusedPaneID string, ratio float64) (Resize, error) {
+//	root(right){ A, inner(right){ B, C } }
+//
+// Setting only `inner` gives B 0.618 of `inner`, and `inner` is just half the
+// tab, so B ends up at 0.618*0.5 = 31%. Every ancestor left at its old ratio
+// scales the result down.
+//
+// So every split between the root and the pane is adjusted. Splits are grouped
+// by axis, because "right" splits divide width and "down" splits divide height
+// and the two are independent. Within an axis crossed k times, each split gives
+// the focused side ratio**(1/k), so the product across them is exactly `ratio`:
+// the pane ends up with 61.8% of the tab's width and 61.8% of its height,
+// regardless of how deeply it is nested.
+//
+// The returned steps are a pure function of the inputs; this performs no I/O.
+func ComputeGoldenRatio(root *Node, focusedPaneID string, ratio float64) ([]Resize, error) {
 	if root == nil {
-		return Resize{}, ErrPaneNotFound
+		return nil, ErrPaneNotFound
 	}
 	if ratio <= 0 || ratio >= 1 {
-		return Resize{}, fmt.Errorf("ratio %v out of range (0,1)", ratio)
+		return nil, fmt.Errorf("ratio %v out of range (0,1)", ratio)
 	}
 
 	path, ok := findPane(root, focusedPaneID)
 	if !ok {
-		return Resize{}, ErrPaneNotFound
+		return nil, ErrPaneNotFound
 	}
 	if len(path) == 0 {
 		// The pane is the tree root, so the tab holds a single pane.
-		return Resize{}, ErrSinglePane
+		return nil, ErrSinglePane
 	}
 
-	// The last step of the path into the pane tells us which side of its
-	// parent split the pane sits on; everything before it addresses the
-	// split itself.
-	parentPath := path[:len(path)-1]
-	focusedIsSecond := path[len(path)-1]
-
-	// set_split_ratio always specifies the First child's share, so a focused
-	// pane on the Second side needs the complement.
-	target := ratio
-	if focusedIsSecond {
-		target = 1 - ratio
+	// Walk root -> pane, recording each split crossed and which side the
+	// focused pane went down.
+	type step struct {
+		path      []bool
+		split     *Node
+		wentRight bool // took the Second child
 	}
-	target = clamp(target, minRatio, maxRatio)
-
-	parent := nodeAt(root, parentPath)
-	if parent == nil || parent.Type != "split" {
-		return Resize{}, ErrPaneNotFound
+	steps := make([]step, 0, len(path))
+	cur := root
+	for i, second := range path {
+		if cur == nil || cur.Type != "split" {
+			return nil, ErrPaneNotFound
+		}
+		steps = append(steps, step{path: path[:i:i], split: cur, wentRight: second})
+		if second {
+			cur = cur.Second
+		} else {
+			cur = cur.First
+		}
 	}
 
-	return Resize{
-		Path:            parentPath,
-		Ratio:           target,
-		Current:         parent.Ratio,
-		Direction:       parent.Direction,
-		FocusedIsSecond: focusedIsSecond,
-	}, nil
+	// How many times each axis is crossed decides each split's share.
+	crossings := map[string]int{}
+	for _, s := range steps {
+		crossings[s.split.Direction]++
+	}
+
+	out := make([]Resize, 0, len(steps))
+	for _, s := range steps {
+		k := crossings[s.split.Direction]
+		// The k-th root, so k splits on this axis multiply out to `ratio`.
+		share := math.Pow(ratio, 1/float64(k))
+
+		// set_split_ratio always specifies the First child's share, so a
+		// focused pane on the Second side needs the complement.
+		target := share
+		if s.wentRight {
+			target = 1 - share
+		}
+
+		out = append(out, Resize{
+			Path:            s.path,
+			Ratio:           clamp(target, minRatio, maxRatio),
+			Current:         s.split.Ratio,
+			Direction:       s.split.Direction,
+			FocusedIsSecond: s.wentRight,
+		})
+	}
+	return out, nil
 }
 
 // findPane returns the sequence of child selections leading from root to the

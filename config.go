@@ -12,7 +12,7 @@ import (
 // Config holds the plugin's user-tunable settings, read from
 // $HERDR_PLUGIN_CONFIG_DIR/config.toml.
 type Config struct {
-	// Ratio is the fraction of its parent split given to the focused pane.
+	// Ratio is the fraction of the tab given to the focused pane.
 	Ratio float64
 	// Auto enables the pane.focused event hook. Off by default: the hook runs
 	// a fresh process on every focus change, so it is opt-in.

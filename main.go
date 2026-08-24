@@ -28,7 +28,7 @@ func main() {
 	case "hook":
 		err = runHook()
 	case "version":
-		fmt.Println("herdr-golden-ratio 0.1.0")
+		fmt.Println("herdr-golden-ratio 0.2.0")
 	default:
 		err = fmt.Errorf("unknown mode %q (want: apply, hook, version)", mode)
 	}
@@ -160,7 +160,7 @@ func Apply(client *Client, cfg Config, layout *LayoutDescription, focusedPaneID 
 		return errors.New("could not determine the focused pane")
 	}
 
-	resize, err := ComputeGoldenRatio(layout.Root, focusedPaneID, cfg.Ratio)
+	steps, err := ComputeGoldenRatio(layout.Root, focusedPaneID, cfg.Ratio)
 	if err != nil {
 		if errors.Is(err, ErrSinglePane) || errors.Is(err, ErrPaneNotFound) {
 			// Nothing to do: a lone pane in a tab, or a pane that has gone
@@ -170,10 +170,20 @@ func Apply(client *Client, cfg Config, layout *LayoutDescription, focusedPaneID 
 		return err
 	}
 
-	// Skip a write that would not visibly change anything.
-	if abs(resize.Current-resize.Ratio) < cfg.MinDelta {
-		return nil
+	// Apply from the root down. Each split's ratio is independent of the
+	// others, so order only affects what the user sees mid-flight; going
+	// outermost-first avoids a visible bounce.
+	for _, s := range steps {
+		// Skip a write that would not visibly change anything.
+		if abs(s.Current-s.Ratio) < cfg.MinDelta {
+			continue
+		}
+		if err := client.SetSplitRatio(layout.TabID, s.Path, s.Ratio); err != nil {
+			if IsNotFound(err) {
+				return nil // The tab went away mid-resize.
+			}
+			return err
+		}
 	}
-
-	return client.SetSplitRatio(layout.TabID, resize.Path, resize.Ratio)
+	return nil
 }
