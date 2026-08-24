@@ -105,33 +105,8 @@ herdr plugin log list --plugin vv.golden-ratio --limit 10
 
 ## Development
 
-Build, test and code layout are documented in
+Build, test, code layout and notes on the Herdr API are documented in
 [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Notes on the Herdr API
-
-Things worth knowing if you extend this, all verified against Herdr 0.8.0 rather
-than taken from the docs:
-
-- `pane.focused` **is** a valid manifest event hook. An unrecognised event name
-  produces a `warnings` entry on `herdr plugin link`, which is a handy way to
-  check any event name.
-- The `pane_focused` payload carries `pane_id` and `workspace_id` but **no
-  `tab_id`**, so the tab has to be resolved from the pane. `layout.export`
-  accepts a `pane_id` and returns the tab id, focused pane and full tree in one
-  call.
-- `layout.set_split_ratio` takes `path` (a bool array: `[]` is the root split,
-  `false` descends into `first`, `true` into `second`) and `ratio`, which is
-  always **the first child's share** — a focused pane on the `second` side needs
-  `1 - ratio`.
-- `pane.resize` is a *relative* nudge, so it cannot express "make this exactly
-  61.8%". `layout.set_split_ratio` is the right primitive.
-- The socket serves **one request per connection** and closes; reconnect per
-  call.
-- `herdr plugin config-dir` resolves the path client-side from
-  `XDG_CONFIG_HOME`, not from the server being addressed. This matters when
-  testing against a second server.
-- Focusing a pane that already has focus emits no `pane_focused` event.
 
 ## License
 
