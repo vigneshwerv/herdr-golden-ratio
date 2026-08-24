@@ -1,0 +1,24 @@
+id = "vv.golden-ratio"
+name = "Golden Ratio"
+version = "0.1.0"
+min_herdr_version = "0.8.0"
+description = "Resize the focused pane to the golden ratio (~61.8%) of its parent split, in place — same tab, same pane ids, processes and scrollback preserved."
+platforms = ["linux", "macos"]
+
+[[build]]
+command = ["go", "build", "-o", "bin/herdr-golden-ratio", "."]
+
+# Manual trigger. Bind this in ~/.config/herdr/config.toml (see README) — herdr
+# ignores keybindings declared in plugin manifests.
+[[actions]]
+id = "apply"
+title = "Golden ratio: resize focused pane"
+contexts = ["pane", "tab", "workspace"]
+command = ["bin/herdr-golden-ratio", "apply"]
+
+# Fully automatic mode. The hook is registered here but does nothing until
+# `auto = true` is set in the plugin config (see README), because herdr spawns a
+# fresh process on every focus change.
+[[events]]
+on = "pane.focused"
+command = ["bin/herdr-golden-ratio", "hook"]
