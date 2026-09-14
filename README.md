@@ -9,8 +9,28 @@ Works two ways:
 - **Manual** — press a key, the focused pane resizes. This is the default.
 - **Automatic** — every focus change re-balances the layout.
   Opt in with `auto = true` (see [Additional configuration](#additional-configuration)).
-  
+
 This plugin only modifies split ratios. Panes are never torn down or created.
+
+> [!IMPORTANT]
+> **Automatic mode does not work on Herdr 0.9.0 — this is a Herdr bug, not a
+> plugin bug.** Manual mode (the keybinding) is unaffected.
+>
+> 0.9.0 stopped emitting the `pane.focused` event when you navigate panes from
+> the UI, so the plugin's event hook is never invoked. Herdr still updates its
+> own focus state, it just does not tell plugins about it — which is why nothing
+> appears in `herdr plugin log list` even though the plugin is installed and
+> enabled correctly.
+>
+> Tracked upstream as [herdrdev/herdr#3824][bug]. It is **fixed on master and
+> marked `pending-release`**, but as of Herdr 0.9.0 no published release —
+> stable or preview — contains the fix.
+>
+> Until a fixed release ships, set `auto = false` and use the keybinding. No
+> plugin change is needed when you do upgrade: the event hook is already
+> declared, so automatic mode starts working again on its own.
+
+[bug]: https://github.com/herdrdev/herdr/issues/3824
 
 ## Requirements
 
@@ -78,6 +98,10 @@ min_delta = 0.02
 Config is read on each invocation, so changes take effect immediately.
 
 ### Turning on automatic mode
+
+> [!WARNING]
+> On Herdr 0.9.0 this has no effect — see the note at the top of this README and
+> [herdrdev/herdr#3824][bug]. The keybinding still works.
 
 Set `auto = true` and you are done; the event hook is already declared in the
 manifest. It is off by default because Herdr spawns a fresh process on every
