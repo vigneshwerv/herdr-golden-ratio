@@ -12,23 +12,16 @@ Works two ways:
 
 This plugin only modifies split ratios. Panes are never torn down or created.
 
-> [!IMPORTANT]
-> **Automatic mode does not work on Herdr 0.9.0 — this is a Herdr bug, not a
-> plugin bug.** Manual mode (the keybinding) is unaffected.
+> [!NOTE]
+> **Automatic mode needs Herdr 0.9.1 or newer.** On 0.9.0 exactly, navigating
+> panes from the UI does not emit the `pane.focused` event, so the hook is never
+> invoked and `auto = true` silently does nothing — no entries appear in
+> `herdr plugin log list` even though the plugin is installed correctly. That
+> was a Herdr bug ([herdrdev/herdr#3824][bug]), fixed in 0.9.1.
 >
-> 0.9.0 stopped emitting the `pane.focused` event when you navigate panes from
-> the UI, so the plugin's event hook is never invoked. Herdr still updates its
-> own focus state, it just does not tell plugins about it — which is why nothing
-> appears in `herdr plugin log list` even though the plugin is installed and
-> enabled correctly.
->
-> Tracked upstream as [herdrdev/herdr#3824][bug]. It is **fixed on master and
-> marked `pending-release`**, but as of Herdr 0.9.0 no published release —
-> stable or preview — contains the fix.
->
-> Until a fixed release ships, set `auto = false` and use the keybinding. No
-> plugin change is needed when you do upgrade: the event hook is already
-> declared, so automatic mode starts working again on its own.
+> Manual mode is unaffected on every supported version. Upgrading needs no
+> plugin change: the event hook is already declared, so automatic mode starts
+> working on its own.
 
 [bug]: https://github.com/herdrdev/herdr/issues/3824
 
@@ -36,6 +29,7 @@ This plugin only modifies split ratios. Panes are never torn down or created.
 
 - Herdr **0.8.0** or newer (needs the `layout.set_split_ratio` method and the
   `pane.focused` event hook).
+- Herdr **0.9.1** or newer for automatic mode — see the note above.
 - Go 1.24+ to build.
 
 ## Install
@@ -99,9 +93,9 @@ Config is read on each invocation, so changes take effect immediately.
 
 ### Turning on automatic mode
 
-> [!WARNING]
-> On Herdr 0.9.0 this has no effect — see the note at the top of this README and
-> [herdrdev/herdr#3824][bug]. The keybinding still works.
+> [!NOTE]
+> Requires Herdr 0.9.1 or newer; on 0.9.0 this has no effect. See the note at
+> the top of this README.
 
 Set `auto = true` and you are done; the event hook is already declared in the
 manifest. It is off by default because Herdr spawns a fresh process on every
